@@ -1,0 +1,42 @@
+apply plugin: 'java'
+apply plugin: 'application'
+apply plugin: 'idea'
+apply plugin: 'eclipse'
+
+jar {
+    baseName = 'jms-tools-spring'
+    version = '0.1.0'
+}
+
+mainClassName = "samples.ProducerApplication"
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile 'org.slf4j:slf4j-api:1.7.7'
+    compile 'org.slf4j:slf4j-simple:1.7.7'
+    compile 'org.apache.qpid:qpid-amqp-1-0-client-jms:0.28'
+    compile 'org.apache.activemq:activemq-client:5.11.0'
+    compile 'org.springframework:spring-jms:4.1.4.RELEASE'
+
+    testCompile 'junit:junit:4.11'
+}
+
+task(ProducerApplication, type: JavaExec) {
+    main = 'samples.ProducerApplication'
+    classpath = sourceSets.main.runtimeClasspath
+}
+
+task(ConsumerApplication, type: JavaExec) {
+    main = 'samples.ConsumerApplication'
+    classpath = sourceSets.main.runtimeClasspath
+    args 'true'
+}
+
+task(AsyncConsumerApplication, type: JavaExec) {
+    main = 'samples.ConsumerApplication'
+    classpath = sourceSets.main.runtimeClasspath
+    args 'false'
+}

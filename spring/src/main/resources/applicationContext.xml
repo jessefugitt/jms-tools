@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:amq="http://activemq.apache.org/schema/core"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:tx="http://www.springframework.org/schema/tx"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+                        http://www.springframework.org/schema/beans/spring-beans.xsd
+                        http://activemq.apache.org/schema/core
+                        http://activemq.apache.org/schema/core/activemq-core-5.5.0.xsd
+                        http://www.springframework.org/schema/context
+                        http://www.springframework.org/schema/context/spring-context.xsd
+                        http://www.springframework.org/schema/jms
+                        http://www.springframework.org/schema/jms/spring-jms.xsd
+                        http://www.springframework.org/schema/tx
+                        http://www.springframework.org/schema/tx/spring-tx.xsd"
+>
+
+    <!-- ActiveMQ connection factory (daemon=true lets the app shutdown after sending) -->
+    <bean id="amqConnectionFactory" class="org.apache.activemq.ActiveMQConnectionFactory">
+        <constructor-arg index="0" value="tcp://127.0.0.1:61616?daemon=true"/>
+    </bean>
+
+    <bean id="qpidConnectionFactory" class="org.apache.qpid.amqp_1_0.jms.impl.ConnectionFactoryImpl ">
+        <constructor-arg index="0" value="127.0.0.1"/>
+        <constructor-arg index="1" value="5672"/>
+        <constructor-arg index="2" value="#{ null }"/>
+        <constructor-arg index="3" value="#{ null }"/>
+    </bean>
+
+        <!-- ConnectionFactory Definition -->
+    <bean id="connectionFactory" class="org.springframework.jms.connection.CachingConnectionFactory">
+        <constructor-arg ref="qpidConnectionFactory" />
+    </bean>
+
+        <!-- JmsTemplate Definition -->
+    <bean id="jmsTemplate" class="org.springframework.jms.core.JmsTemplate">
+        <property name="connectionFactory" ref="connectionFactory" />
+        <property name="defaultDestinationName" value="topic.ABC" />
+        <!--
+        <property name="defaultDestinationName" value="queue://queue-A" />
+        -->
+        <!--
+        <property name="pubSubDomain" value="true"/>
+        -->
+        <property name="receiveTimeout" value="1000" />
+    </bean>
+
+        <!-- Actual Producer Class -->
+    <bean id="springJmsProducer" class="samples.SpringJmsProducer">
+        <property name="jmsTemplate" ref="jmsTemplate"/>
+    </bean>
+
+        <!-- Actual Consumer Class -->
+    <bean id="springJmsConsumer" class="samples.SpringJmsConsumer">
+        <property name="jmsTemplate" ref="jmsTemplate"/>
+    </bean>
+
+        <!-- Bean Used For Async Consumer -->
+    <bean id="listenerContainer" class="org.springframework.jms.listener.DefaultMessageListenerContainer">
+        <property name="connectionFactory" ref="connectionFactory" />
+        <property name="destinationName" value="topic.ABC" />
+        <property name="messageListener" ref="springJmsConsumer" />
+        <property name="autoStartup" value="false" /> <!-- defaults to true but we want to start manually if needed -->
+    </bean>
+</beans>

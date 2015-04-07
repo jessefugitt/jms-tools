@@ -1,0 +1,43 @@
+apply plugin: 'java'
+apply plugin: 'application'
+apply plugin: 'idea'
+apply plugin: 'eclipse'
+
+jar {
+    baseName = 'jms-tools-utility'
+    version = '0.1.0'
+}
+
+mainClassName = "tools.ProducerTool"
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile 'org.slf4j:slf4j-api:1.7.7'
+    compile 'commons-cli:commons-cli:1.2'
+    compile 'org.apache.geronimo.specs:geronimo-jms_1.1_spec:1.1.1'
+
+    runtime 'org.apache.activemq:activemq-client:5.11.0'
+    runtime 'org.slf4j:slf4j-simple:1.7.7'
+    //runtime 'org.apache.qpid:qpid-amqp-1-0-client-jms:0.28'
+
+    testCompile 'junit:junit:4.11'
+}
+
+task(ProducerTool, type: JavaExec) {
+    main = 'tools.ProducerTool'
+    classpath = sourceSets.main.runtimeClasspath
+    if (project.hasProperty('Args')) {
+        args(Args.split())
+    }
+}
+
+task(ConsumerTool, type: JavaExec) {
+    main = 'tools.ConsumerTool'
+    classpath = sourceSets.main.runtimeClasspath
+    if (project.hasProperty('Args')) {
+        args(Args.split())
+    }
+}
