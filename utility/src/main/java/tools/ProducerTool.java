@@ -44,7 +44,7 @@ public class ProducerTool implements Runnable {
     private String destinationName = "DESTINATION.123"; //n
     boolean useFinalControlMessage = false; //o
     private boolean useTemporaryDestinations = false; //p
-    private boolean useQueueDestinations = true; //q
+    private boolean useQueueDestinations = false; //q
     private boolean transacted = false; //t
     private String messageGroupId = null; //x
     private int batchSize = 1; //z
@@ -52,10 +52,12 @@ public class ProducerTool implements Runnable {
     private Context context;
     private ConnectionFactory connectionFactory;
 
-    public static void main(String[] args) throws NamingException, InterruptedException {
+    public static void main(String[] args) throws Exception {
         LOGGER.info("Starting ProducerTool");
         ProducerTool producerTool = new ProducerTool();
         producerTool.parseCommandLine(args);
+        producerTool.logInternalState();
+        producerTool.validateInternalState();
         producerTool.setupContextAndConnectionFactory();
 
         if(producerTool.numThreads > 1) {
@@ -125,20 +127,24 @@ public class ProducerTool implements Runnable {
                         byte[] paddingBytes = new byte[bytesLength - messageTextBytes.length];
                         bytesMessage.writeBytes(paddingBytes);
                     }
+                    if (messageGroupId != null) {
+                        bytesMessage.setStringProperty("JMSXGroupID", messageGroupId);
+                    }
+                    LOGGER.info("Sending bytes message");
                     producer.send(bytesMessage);
                 } else {
-                    LOGGER.info("Sending message: " + messageText);
                     TextMessage textMessage = session.createTextMessage(messageText);
                     if (messageGroupId != null) {
                         textMessage.setStringProperty("JMSXGroupID", messageGroupId);
                     }
+                    LOGGER.info("Sending text message: " + messageText);
                     producer.send(textMessage);
                 }
 
                 if (perMessageSleepMS > 0) {
                     Thread.sleep(perMessageSleepMS);
                 }
-                if (transacted == true) {
+                if (transacted) {
                     if ((i + 1) % batchSize == 0) {
                         session.commit();
                     }
@@ -149,8 +155,9 @@ public class ProducerTool implements Runnable {
                 if(messageGroupId != null) {
                     message.setStringProperty("JMSXGroupID", messageGroupId);
                 }
+                LOGGER.info("Sending message");
                 producer.send(message);
-                if (transacted == true) {
+                if (transacted) {
                     session.commit();
                 }
             }
@@ -382,5 +389,20 @@ public class ProducerTool implements Runnable {
         }
     }
 
+    public void logInternalState() {
+        LOGGER.info("Internal state: acknowledgeMode = {}, clientId = {}, durable = {}, perMessageSleepMS = {}, connectionFactoryName = {}, " +
+                "numThreads = {}, jndiLookupDestinations = {}, bytesLength = {}, numMessages = {}, destinationName = {}, " +
+                "useFinalControlMessage = {}, useTemporaryDestinations = {}, useQueueDestinations = {}, transacted = {}, " +
+                "messageGroupId = {}, batchSize = {}",
+                new Object[] {acknowledgeMode, clientId, durable, perMessageSleepMS, connectionFactoryName, numThreads,
+                        jndiLookupDestinations, bytesLength, numMessages, destinationName, useFinalControlMessage,
+                        useTemporaryDestinations, useQueueDestinations, transacted, messageGroupId, batchSize});
 
+    }
+
+    private void validateInternalState() throws Exception {
+        if(bytesLength < -1) {
+            throw new Exception("Cannot set bytesLength to a negative number");
+        }
+    }
 }

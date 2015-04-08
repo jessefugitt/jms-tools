@@ -33,7 +33,7 @@ public class ConsumerTool implements Runnable {
     static Logger LOGGER = LoggerFactory.getLogger(ConsumerTool.class);
 
     private int acknowledgeMode = Session.AUTO_ACKNOWLEDGE; //a
-    private boolean useQueueBrowser = false;
+    private boolean useQueueBrowser = false; //b
     private String clientId = null; //c
     private boolean durable = false; //d
     private int perMessageSleepMS = 0; //e
@@ -54,10 +54,12 @@ public class ConsumerTool implements Runnable {
     private Context context;
     private ConnectionFactory connectionFactory;
 
-    public static void main(String[] args) throws NamingException, InterruptedException {
+    public static void main(String[] args) throws Exception {
         LOGGER.info("Starting ConsumerTool");
         ConsumerTool consumerTool = new ConsumerTool();
         consumerTool.parseCommandLine(args);
+        consumerTool.logInternalState();
+        consumerTool.validateInternalState();
         consumerTool.setupContextAndConnectionFactory();
 
         if(consumerTool.numThreads > 1) {
@@ -108,89 +110,69 @@ public class ConsumerTool implements Runnable {
                 }
             }
 
-            MessageConsumer consumer = null;
-            QueueBrowser browser = null;
-            if(useQueueDestinations == false) {
-                if(durable == true) {
-                    if (selector != null) {
-                        consumer = session.createDurableSubscriber((Topic) destination, subscriptionName, selector, false);
-                    } else {
-                        consumer = session.createDurableSubscriber((Topic) destination, subscriptionName);
-                    }
-                } else {
-                    if (selector != null) {
-                        consumer = session.createConsumer(destination, selector);
-                    } else {
-                        consumer = session.createConsumer(destination);
-                    }
-                }
+            if(useQueueBrowser) {
+                runQueueBrowser(session, (Queue) destination);
             } else {
-                if(useQueueBrowser) {
-                    if (selector != null) {
-                        browser = session.createBrowser((Queue) destination, selector);
-                    } else {
-                        browser = session.createBrowser((Queue) destination);
-                    }
-                } else {
+                MessageConsumer consumer = null;
+                if (useQueueDestinations) { //Queues
                     if (selector != null) {
                         consumer = session.createConsumer(destination, selector);
                     } else {
                         consumer = session.createConsumer(destination);
                     }
-                }
-            }
-
-            if (useAsyncListener) {
-                final Session consumerSession = session;
-
-                final AtomicInteger perConsumerReceivedMessages = new AtomicInteger(0);
-                consumer.setMessageListener(new MessageListener() {
-
-                    @Override
-                    public void onMessage(Message message) {
-                        perConsumerReceivedMessages.incrementAndGet();
-                        handleMessage(consumerSession, message, perConsumerReceivedMessages.get());
-                    }
-                });
-                while (perConsumerReceivedMessages.get() < numMessages) {
-                    Thread.sleep(100);
-                }
-            } else if(useQueueBrowser) {
-                Enumeration messages = browser.getEnumeration();
-                int perConsumerReceivedMessages = 0;
-                while (perConsumerReceivedMessages < numMessages) {
-                    if(messages != null) {
-                        while (messages.hasMoreElements()){
-                            Message message = (Message) messages.nextElement();
-                            if (message != null) {
-                                perConsumerReceivedMessages++;
-                                handleMessage(session, message, perConsumerReceivedMessages);
-                            }
+                } else { //Queues
+                    if (durable) { //Durable Subscribers
+                        if (selector != null) {
+                            consumer = session.createDurableSubscriber((Topic) destination, subscriptionName, selector, false);
+                        } else {
+                            consumer = session.createDurableSubscriber((Topic) destination, subscriptionName);
+                        }
+                    } else { //Non-Durable Subscribers
+                        if (selector != null) {
+                            consumer = session.createConsumer(destination, selector);
+                        } else {
+                            consumer = session.createConsumer(destination);
                         }
                     }
-                    Thread.sleep(receiveTimeoutMS);
-                    messages = browser.getEnumeration();
                 }
-            } else {
-                int perConsumerReceivedMessages = 0;
-                while (perConsumerReceivedMessages < numMessages) {
 
-                    Message message = null;
-                    if (receiveTimeoutMS > -1) {
-                        message = consumer.receive(receiveTimeoutMS);
-                    } else {
-                        message = consumer.receive();
+                if (useAsyncListener) {
+                    final Session consumerSession = session;
+
+                    final AtomicInteger perConsumerReceivedMessages = new AtomicInteger(0);
+                    consumer.setMessageListener(new MessageListener() {
+
+                        @Override
+                        public void onMessage(Message message) {
+                            perConsumerReceivedMessages.incrementAndGet();
+                            handleMessage(consumerSession, message, perConsumerReceivedMessages.get());
+                        }
+                    });
+                    while (perConsumerReceivedMessages.get() < numMessages) {
+                        Thread.sleep(100);
                     }
+                } else {
+                    int perConsumerReceivedMessages = 0;
+                    while (perConsumerReceivedMessages < numMessages) {
 
-                    if (message != null) {
-                        perConsumerReceivedMessages++;
-                        handleMessage(session, message, perConsumerReceivedMessages);
+                        Message message = null;
+                        if (receiveTimeoutMS > -1) {
+                            message = consumer.receive(receiveTimeoutMS);
+                        } else {
+                            message = consumer.receive();
+                        }
+
+                        if (message != null) {
+                            perConsumerReceivedMessages++;
+                            handleMessage(session, message, perConsumerReceivedMessages);
+                        }
                     }
                 }
+                consumer.close();
             }
-            consumer.close();
+
         } catch (Exception ex) {
-            LOGGER.error("ConsumerTool hit exception:" + ex.getMessage(), ex);
+            LOGGER.error("ConsumerTool hit exception: " + ex.getMessage(), ex);
         } finally {
             if (session != null) {
                 try {
@@ -207,6 +189,33 @@ public class ConsumerTool implements Runnable {
                 }
             }
         }
+    }
+
+    public void runQueueBrowser(Session session, Queue queue) throws JMSException, InterruptedException {
+        QueueBrowser browser = null;
+        if (selector != null) {
+            browser = session.createBrowser(queue, selector);
+        } else {
+            browser = session.createBrowser(queue);
+        }
+
+        Enumeration messages = browser.getEnumeration();
+        int perConsumerReceivedMessages = 0;
+        while (perConsumerReceivedMessages < numMessages) {
+            if(messages != null) {
+                while (messages.hasMoreElements()){
+                    Message message = (Message) messages.nextElement();
+                    if (message != null) {
+                        perConsumerReceivedMessages++;
+                        handleMessage(session, message, perConsumerReceivedMessages);
+                    }
+                }
+            }
+            Thread.sleep(receiveTimeoutMS);
+            messages = browser.getEnumeration();
+        }
+        browser.close();
+
     }
 
     public void handleMessage(Session session, Message message, int perConsumerReceivedMessages) {
@@ -230,13 +239,13 @@ public class ConsumerTool implements Runnable {
                     message.acknowledge();
                 }
             }
-            if (transacted == true) {
+            if (transacted) {
                 if (perConsumerReceivedMessages % batchSize == 0) {
                     session.commit();
                 }
             }
         } catch (JMSException e) {
-            LOGGER.error("JMSException handling message" + e.getMessage(), e);
+            LOGGER.error("JMSException handling message: " + e.getMessage(), e);
         }
     }
 
@@ -464,6 +473,25 @@ public class ConsumerTool implements Runnable {
             HelpFormatter formatter = new HelpFormatter();
             formatter.printHelp("ConsumerTool", options, true);
             System.exit(-1);
+        }
+    }
+
+    public void logInternalState() {
+        LOGGER.info("Internal state: acknowledgeMode = {}, useQueueBrowser = {}, clientId = {}, durable = {}, perMessageSleepMS = {}, " +
+                "connectionFactoryName = {}, numThreads = {}, jndiLookupDestinations = {}, selector = {}, numMessages = {}, " +
+                "destinationName = {}, useTemporaryDestinations = {}, useQueueDestinations = {}, receiveTimeoutMS = {}, " +
+                "subscriptionName = {}, transacted = {}, useAsyncListener = {}, batchSize = {}",
+                new Object[] {acknowledgeMode, useQueueBrowser, clientId, durable, perMessageSleepMS, connectionFactoryName,
+                        numThreads, jndiLookupDestinations, selector, numMessages, destinationName, useTemporaryDestinations,
+                        useQueueDestinations, receiveTimeoutMS, subscriptionName, transacted, useAsyncListener, batchSize});
+    }
+
+    public void validateInternalState() throws Exception {
+        if(useQueueBrowser && !useQueueDestinations) {
+            throw new Exception("Cannot use a queue browser without setting to use queue destinations (-q)");
+        }
+        if(useQueueDestinations && durable) {
+            throw new Exception("Cannot create a durable (-d) queue receiver (-q). Durable can only be used with topic subscribers.");
         }
     }
 }
