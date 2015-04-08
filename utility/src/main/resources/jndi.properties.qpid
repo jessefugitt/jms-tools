@@ -1,0 +1,20 @@
+java.naming.factory.initial = org.apache.qpid.amqp_1_0.jms.jndi.PropertiesFileInitialContextFactory
+
+# can also set this to a different properties file to provide qpid configuration there
+#java.naming.provider.url = /some/properties/file
+
+# register some connection factories
+# connectionfactory.[jndiname] = [ConnectionURL]
+connectionfactory.localhost = amqp://guest:guest@localhost:5672?clientid=test-client&remote-host=default
+connectionfactory.connectionFactory = amqp://127.0.0.1:5672
+connectionfactory.queueConnectionFactory = amqp://127.0.0.1:5672
+connectionfactory.topicConnectionFactory = amqp://127.0.0.1:5672
+# Remove the remote-host option to make the AMQP open-frame hostname field simply match the URL hostname
+
+# Register an AMQP destination in JNDI
+# destination.[jniName] = [Address Format]
+queue.MyQueue = example.MyQueue
+
+# Register an AMQP destination in JNDI
+# destination.[jniName] = [Address Format]
+topic.MyTopic = example.MyTopic
