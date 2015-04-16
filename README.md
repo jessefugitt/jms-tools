@@ -1,4 +1,10 @@
 # jms-tools
+
+[![Build Status][build-status-image]][build-status]
+
+[build-status-image]: https://travis-ci.org/jessefugitt/jms-tools.svg?branch=master
+[build-status]: https://travis-ci.org/jessefugitt/jms-tools
+
 A set of standard JMS (Java Message Service) tools.
 
 Spring Module
