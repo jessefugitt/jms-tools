@@ -1,2 +1,3 @@
-rootProject.name = 'jms-tools'
+include 'spring', 'utility'
+
 
