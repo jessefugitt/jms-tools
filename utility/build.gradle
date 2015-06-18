@@ -21,7 +21,8 @@ dependencies {
 
     runtime 'org.slf4j:slf4j-simple:1.7.7'
     runtime 'org.apache.activemq:activemq-client:5.11.0'
-    runtime 'org.apache.qpid:qpid-amqp-1-0-client-jms:0.32'
+    //runtime 'org.apache.qpid:qpid-amqp-1-0-client-jms:0.32'
+    runtime 'org.apache.qpid:qpid-jms-client:0.4.0'
 
     testCompile 'junit:junit:4.11'
 }
